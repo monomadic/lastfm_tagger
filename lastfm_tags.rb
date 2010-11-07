@@ -41,12 +41,17 @@ class Last_fm
       xml = request.body
       doc = REXML::Document.new(xml)
       
-      doc.root.elements['toptags'].each_with_index do |tag, index|
-        break if index == MaxTags * 2
-        if tag.respond_to?(:elements) then
-          tags << tag.elements['name'].text.capitalize
+      if doc.root.elements['toptags'].nil? then
+        puts "Error parsing xml:"
+        puts doc.root
+      else
+        doc.root.elements['toptags'].each_with_index do |tag, index|
+          break if index == MaxTags * 2
+          if tag.respond_to?(:elements) then
+            tags << tag.elements['name'].text.capitalize
+          end
         end
-      end  
+      end
       tags.join(', ')
     end
     
@@ -55,25 +60,32 @@ class Last_fm
 end
 
 class Mp3Tagger
-  def self.tag_files_in(_directory, _tags)
+  def self.tag_files_in(_artist)
+    _directory = "#{MusicDirectory}/#{_artist}"
     files_tagged_count = 0
+    files_found_count = 0
+    puts "Processing: [#{_directory}]"
+    lastfm_connection = Last_fm::Artist.new(_artist)
+    top_tags = nil
+    
+    
     Dir.chdir(_directory)
     musicfiles = File.join("**", "*.mp3")
     Dir.glob(musicfiles).each do |file|
       file_to_tag = ID3Lib::Tag.new(file)
       if file_to_tag.grouping.nil? then
-        file_to_tag.grouping = _tags
+        top_tags ||= lastfm_connection.top_tags # fill the tag cache if it is empty
+        file_to_tag.grouping = top_tags
         file_to_tag.update!
         files_tagged_count += 1
-      end
+      end  
+      files_found_count += 1
     end
-    puts "#{files_tagged_count} files tagged."
+    puts "\t#{files_tagged_count}/#{files_found_count} files tagged."
   end
 end
 
 Dir.chdir(MusicDirectory)
 Dir.glob('*') do |artist|
-  response = Last_fm::Artist.new(artist)
-  puts "\t" + response.top_tags
-  Mp3Tagger.tag_files_in("#{MusicDirectory}/#{artist}", response.top_tags)
+  Mp3Tagger.tag_files_in(artist)
 end
