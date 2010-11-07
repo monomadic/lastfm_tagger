@@ -35,7 +35,7 @@ class Last_fm
       uri = URI.parse(URI.escape(request_uri)) or raise "invalid API url."
       tags = []
       
-      puts "Searching Last.FM for: #{@name}:"
+      puts "\tSearching lastfm for #{@name}."
       request = Net::HTTP.get_response(uri.host, uri.request_uri) or raise "Network error accessing last.fm api."
       request.body
       xml = request.body
@@ -48,7 +48,7 @@ class Last_fm
         doc.root.elements['toptags'].each_with_index do |tag, index|
           break if index == MaxTags * 2
           if tag.respond_to?(:elements) then
-            tags << tag.elements['name'].text.capitalize
+            tags << tag.elements['name'].text.downcase
           end
         end
       end
@@ -66,22 +66,20 @@ class Mp3Tagger
     files_found_count = 0
     puts "Processing: [#{_directory}]"
     lastfm_connection = Last_fm::Artist.new(_artist)
-    top_tags = nil
-    
-    
+    top_tags = nil # initialise empty tag cache
     Dir.chdir(_directory)
     musicfiles = File.join("**", "*.mp3")
     Dir.glob(musicfiles).each do |file|
       file_to_tag = ID3Lib::Tag.new(file)
       if file_to_tag.grouping.nil? then
-        top_tags ||= lastfm_connection.top_tags # fill the tag cache if it is empty
+        top_tags ||= lastfm_connection.top_tags # fill the tag cache if it is empty, since there are tracks to be tagged
         file_to_tag.grouping = top_tags
         file_to_tag.update!
         files_tagged_count += 1
       end  
       files_found_count += 1
     end
-    puts "\t#{files_tagged_count}/#{files_found_count} files tagged."
+    puts "\t#{files_tagged_count}/#{files_found_count} files tagged. <#{top_tags}>"
   end
 end
 
